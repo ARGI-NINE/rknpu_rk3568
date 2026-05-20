@@ -135,6 +135,11 @@ MP4 模式：
 ./rknn_yolov5_rk3568 ./model/yolov5s-640-640.rknn ./video/test.mp4 1
 ```
 
+当前行为说明：
+- 以上三参数命令示例保持不变；同一条命令现在会在一个进程内同时启动推理链路和 RTSP 推流链路，不需要额外的 RTSP 启动命令。
+- 当前 RTSP 推流目标为硬编码：`rtsp://192.168.30.26:8554/rk3568-001/cam0`。
+- RTSP 初始化在程序启动阶段执行；若初始化失败，程序会直接退出。
+
 参数说明：
 - 第 1 个参数：`.rknn` 模型路径
 - 第 2 个参数：输入源（`/dev/videoX` 或 mp4 文件）
@@ -153,6 +158,8 @@ MP4 模式：
 | CLI worker 上限 | `16` | 由 `src/main.cc` 中 `kMaxWorkerThreads` 固定约束。 |
 | 摄像头默认分辨率 | `640x480` | 默认请求宽高。 |
 | V4L2 `REQBUFS` 数量 | `4` | V4L2 缓冲区请求数量。 |
+| RTSP 推流目标 | `rtsp://192.168.30.26:8554/rk3568-001/cam0` | 当前推流地址硬编码在 `src/main.cc`，无 CLI 或环境变量覆盖入口。 |
+| RTSP 初始化失败行为 | 启动失败即退出 | `rtsp_encoder.open(...)` 失败后直接返回错误并退出程序。 |
 
 ### 6.5 frame metadata 现状（`frame_id/src_ts_us`）
 

@@ -19,4 +19,11 @@ int rga_resize_convert(void *src_data, int src_w, int src_h, int src_fmt,
 int rga_resize_convert_vaddr(void *src_data, int src_w, int src_h, int src_fmt,
                              void *dst_data, int dst_w, int dst_h, int dst_fmt);
 
+// Resize and convert a source frame into a stride-aware NV12 destination buffer.
+// Uses improcess() so scale + format conversion are described explicitly.
+int rga_resize_to_nv12_vaddr(void *src_data, int src_w, int src_h,
+                             int src_wstride, int src_hstride, int src_fmt,
+                             void *dst_data, int dst_w, int dst_h,
+                             int dst_wstride, int dst_hstride);
+
 #endif

@@ -45,6 +45,8 @@ public:
 
     int  getWidth()  const { return video_width_; }
     int  getHeight() const { return video_height_; }
+    int  getFpsNum() const { return fps_num_; }
+    int  getFpsDen() const { return fps_den_; }
 
 private:
     // ffmpeg demux
@@ -62,6 +64,8 @@ private:
     // Frame info
     int    video_width_;
     int    video_height_;
+    int    fps_num_;
+    int    fps_den_;
 
     // Reusable frame buffer (NV12, stripped of stride padding)
     unsigned char *frame_buf_;

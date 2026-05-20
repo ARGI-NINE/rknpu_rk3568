@@ -49,6 +49,7 @@ add_executable(rknn_yolov5_rk3568
     src/postprocess.cc
     src/v4l2_capture.cc
     src/mpp_decoder.cc
+    src/mpp_encoder_rtsp.cc
     src/drm_display.cc
 )
 

@@ -10,7 +10,7 @@
 
 V4L2Capture::V4L2Capture(const std::string &device, int width, int height, int bufferCount)
     : device_(device), fd_(-1), reqWidth_(width), reqHeight_(height), reqBufferCount_(bufferCount),
-      width_(0), height_(0), pixfmt_(0), bufferCount_(0), currentIdx_(-1)
+      width_(0), height_(0), pixfmt_(0), bufferCount_(0), fpsNum_(30), fpsDen_(1)
 {
     if (reqBufferCount_ < 2) {
         reqBufferCount_ = 2;
@@ -58,6 +58,11 @@ int V4L2Capture::open()
         return -1;
     }
 
+    if (initStreamParams() != 0) {
+        ::close(fd_); fd_ = -1;
+        return -1;
+    }
+
     if (initMmap() != 0) {
         ::close(fd_); fd_ = -1;
         return -1;
@@ -99,6 +104,30 @@ int V4L2Capture::initFormat()
     pixfmt_ = fmt.fmt.pix.pixelformat;
 
     printf("V4L2: actual format %dx%d pixfmt=0x%08x\n", width_, height_, pixfmt_);
+    return 0;
+}
+
+int V4L2Capture::initStreamParams()
+{
+    struct v4l2_streamparm parm;
+    memset(&parm, 0, sizeof(parm));
+    parm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    if (ioctl(fd_, VIDIOC_G_PARM, &parm) < 0) {
+        perror("V4L2: G_PARM");
+        fpsNum_ = 30;
+        fpsDen_ = 1;
+        return 0;
+    }
+
+    if (parm.parm.capture.timeperframe.numerator > 0 &&
+        parm.parm.capture.timeperframe.denominator > 0) {
+        fpsNum_ = (int)parm.parm.capture.timeperframe.denominator;
+        fpsDen_ = (int)parm.parm.capture.timeperframe.numerator;
+    } else {
+        fpsNum_ = 30;
+        fpsDen_ = 1;
+    }
+
     return 0;
 }
 
@@ -173,8 +202,12 @@ int V4L2Capture::startStream()
     return 0;
 }
 
-int V4L2Capture::captureFrame(void **data, int *size)
+int V4L2Capture::dequeueFrame(V4L2Frame *frame)
 {
+    if (!frame) {
+        return -1;
+    }
+
     struct v4l2_buffer buf;
     memset(&buf, 0, sizeof(buf));
     buf.type   = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -185,31 +218,37 @@ int V4L2Capture::captureFrame(void **data, int *size)
         return -1;
     }
 
-    currentIdx_ = buf.index;
-    if (currentIdx_ < 0 || currentIdx_ >= bufferCount_) {
-        fprintf(stderr, "V4L2: invalid buffer index %d\n", currentIdx_);
+    if ((int)buf.index < 0 || (int)buf.index >= bufferCount_) {
+        fprintf(stderr, "V4L2: invalid buffer index %u\n", buf.index);
         return -1;
     }
-    *data = buffers_[currentIdx_].start;
-    *size = (int)buf.bytesused;
+
+    frame->data = buffers_[buf.index].start;
+    frame->size = (int)buf.bytesused;
+    frame->index = (int)buf.index;
+    frame->capture_ts_us = (long long)buf.timestamp.tv_sec * 1000000LL +
+                           (long long)buf.timestamp.tv_usec;
     return 0;
 }
 
-void V4L2Capture::releaseFrame()
+int V4L2Capture::queueFrame(const V4L2Frame &frame)
 {
-    if (currentIdx_ < 0) return;
+    if (frame.index < 0 || frame.index >= bufferCount_) {
+        return -1;
+    }
 
     struct v4l2_buffer buf;
     memset(&buf, 0, sizeof(buf));
     buf.type   = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     buf.memory = V4L2_MEMORY_MMAP;
-    buf.index  = currentIdx_;
+    buf.index  = (unsigned int)frame.index;
 
     if (ioctl(fd_, VIDIOC_QBUF, &buf) < 0) {
         perror("V4L2: QBUF (release)");
+        return -1;
     }
 
-    currentIdx_ = -1;
+    return 0;
 }
 
 int V4L2Capture::stopStream()

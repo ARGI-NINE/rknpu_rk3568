@@ -21,7 +21,7 @@ MppDecoder::MppDecoder()
     : fmt_ctx_(nullptr), bsf_ctx_(nullptr), pkt_(nullptr), filtered_pkt_(nullptr),
       video_stream_idx_(-1),
       mpp_ctx_(nullptr), mpi_(nullptr), frm_grp_(nullptr),
-      video_width_(0), video_height_(0),
+      video_width_(0), video_height_(0), fps_num_(30), fps_den_(1),
       frame_buf_(nullptr), frame_buf_size_(0),
     eos_sent_(false), eos_got_(false) {}
 
@@ -56,8 +56,19 @@ int MppDecoder::open(const char *filepath) {
     }
 
     AVCodecParameters *codecpar = fmt_ctx_->streams[video_stream_idx_]->codecpar;
+    AVStream *video_stream = fmt_ctx_->streams[video_stream_idx_];
     video_width_  = codecpar->width;
     video_height_ = codecpar->height;
+    if (video_stream->avg_frame_rate.num > 0 && video_stream->avg_frame_rate.den > 0) {
+        fps_num_ = video_stream->avg_frame_rate.num;
+        fps_den_ = video_stream->avg_frame_rate.den;
+    } else if (video_stream->r_frame_rate.num > 0 && video_stream->r_frame_rate.den > 0) {
+        fps_num_ = video_stream->r_frame_rate.num;
+        fps_den_ = video_stream->r_frame_rate.den;
+    } else {
+        fps_num_ = 30;
+        fps_den_ = 1;
+    }
 
     // ---- 2. Determine codec → MPP coding type ----
     MppCodingType coding = MPP_VIDEO_CodingUnused;
@@ -181,6 +192,8 @@ void MppDecoder::close() {
     free(frame_buf_);
     frame_buf_      = nullptr;
     frame_buf_size_ = 0;
+    fps_num_ = 30;
+    fps_den_ = 1;
     eos_sent_ = false;
     eos_got_  = false;
 }
